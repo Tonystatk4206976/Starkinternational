@@ -25,6 +25,29 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _parse_key_value(value: str, *, separator: str, label: str) -> tuple[str, str]:
+    if separator not in value:
+        raise argparse.ArgumentTypeError(
+            f"{label} must include '{separator}' (got {value!r})"
+        )
+    key, raw_value = value.split(separator, 1)
+    key = key.strip()
+    raw_value = raw_value.strip()
+    if not key:
+        raise argparse.ArgumentTypeError(f"{label} key must not be empty")
+    if not raw_value:
+        raise argparse.ArgumentTypeError(f"{label} value must not be empty")
+    return key, raw_value
+
+
+def _parse_query(value: str) -> tuple[str, str]:
+    return _parse_key_value(value, separator="=", label="query parameter")
+
+
+def _parse_header(value: str) -> tuple[str, str]:
+    return _parse_key_value(value, separator=":", label="header")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Index and search local files using SQLite FTS5.",
@@ -130,6 +153,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fully-qualified URL to query. The address is appended as a query parameter.",
     )
     address_check.add_argument(
+        "--query-param",
+        default="address",
+        help="Query parameter name used to send the address.",
+    )
+    address_check.add_argument(
+        "--query",
+        action="append",
+        type=_parse_query,
+        default=[],
+        help="Extra query parameters to include (key=value).",
+    )
+    address_check.add_argument(
+        "--header",
+        action="append",
+        type=_parse_header,
+        default=[],
+        help="Additional HTTP headers to send (Header: value).",
+    )
+    address_check.add_argument(
         "--timeout",
         type=float,
         default=10.0,
@@ -231,12 +273,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     print("No addresses stored to validate.")
                     return 0
 
+            extra_query = dict(args.query)
+            headers = dict(args.header)
             for target in targets:
                 try:
                     payload = check_address_live(
                         target,
                         endpoint=args.endpoint,
                         timeout=args.timeout,
+                        extra_query=extra_query,
+                        query_param=args.query_param,
+                        headers=headers,
                     )
                 except Exception as exc:  # pragma: no cover - network dependent
                     print(f"{target}: ERROR - {exc}")

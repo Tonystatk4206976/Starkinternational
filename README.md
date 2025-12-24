@@ -39,3 +39,7 @@ The `check` sub-command performs a GET request against the provided endpoint
 with the address appended as a query parameter. The response is expected to be a
 JSON object that includes an `"exists"` flag indicating whether the address is
 found in the live database; any additional fields are printed for inspection.
+
+Use `--query-param` to change the address parameter name, `--query key=value`
+to add extra query parameters, and `--header "Name: value"` to send additional
+HTTP headers.

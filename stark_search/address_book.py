@@ -16,6 +16,7 @@ __all__ = [
     "add_address",
     "list_addresses",
     "check_address_live",
+    "check_addresses_live",
 ]
 
 
@@ -73,6 +74,8 @@ def check_address_live(
     endpoint: str,
     timeout: float = 10.0,
     extra_query: Optional[dict[str, str]] = None,
+    query_param: str = "address",
+    headers: Optional[dict[str, str]] = None,
 ) -> dict:
     """Query a remote API endpoint to validate *address*.
 
@@ -87,11 +90,16 @@ def check_address_live(
     if not cleaned:
         raise ValueError("address must not be empty")
 
-    url = _compose_lookup_url(endpoint, cleaned, extra_query or {})
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    url = _compose_lookup_url(endpoint, cleaned, extra_query or {}, query_param)
+    merged_headers = _merge_headers(headers)
+    request = urllib.request.Request(url, headers=merged_headers)
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
+            if hasattr(response, "status") and response.status >= 400:
+                raise ConnectionError(
+                    f"Live database returned status {response.status} for {url}"
+                )
             payload = json.load(response)
     except urllib.error.URLError as exc:  # pragma: no cover - network errors
         raise ConnectionError(f"Failed to query live database: {exc}") from exc
@@ -103,8 +111,53 @@ def check_address_live(
     return payload
 
 
+def check_addresses_live(
+    addresses: Iterable[str],
+    *,
+    endpoint: str,
+    timeout: float = 10.0,
+    extra_query: Optional[dict[str, str]] = None,
+    query_param: str = "address",
+    headers: Optional[dict[str, str]] = None,
+) -> list[dict]:
+    """Validate multiple addresses against a live HTTP endpoint.
+
+    Returns a list of payloads in the same order as the *addresses* iterable.
+    """
+
+    merged_headers = _merge_headers(headers)
+    results: list[dict] = []
+    for address in addresses:
+        cleaned = address.strip()
+        if not cleaned:
+            raise ValueError("address must not be empty")
+        url = _compose_lookup_url(endpoint, cleaned, extra_query or {}, query_param)
+        request = urllib.request.Request(url, headers=merged_headers)
+
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                if hasattr(response, "status") and response.status >= 400:
+                    raise ConnectionError(
+                        f"Live database returned status {response.status} for {url}"
+                    )
+                payload = json.load(response)
+        except urllib.error.URLError as exc:  # pragma: no cover - network errors
+            raise ConnectionError(f"Failed to query live database: {exc}") from exc
+
+        if not isinstance(payload, dict):
+            raise ValueError("Endpoint did not return a JSON object")
+
+        payload.setdefault("query_address", cleaned)
+        results.append(payload)
+
+    return results
+
+
 def _compose_lookup_url(
-    endpoint: str, address: str, extra_params: Iterable[tuple[str, str]] | dict[str, str]
+    endpoint: str,
+    address: str,
+    extra_params: Iterable[tuple[str, str]] | dict[str, str],
+    query_param: str,
 ) -> str:
     parsed = urllib.parse.urlparse(endpoint)
     if not parsed.scheme or not parsed.netloc:
@@ -119,13 +172,19 @@ def _compose_lookup_url(
 
     query_params = list(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
     query_params.extend(normalized_params)
-    query_params.append(("address", address))
+    query_params.append((query_param, address))
 
     encoded_query = urllib.parse.urlencode(query_params)
     rebuilt = parsed._replace(query=encoded_query)
     return urllib.parse.urlunparse(rebuilt)
 
 
+def _merge_headers(headers: Optional[dict[str, str]]) -> dict[str, str]:
+    merged_headers = {"Accept": "application/json"}
+    if headers:
+        merged_headers.update(headers)
+    return merged_headers
+
+
 def sqlite_dict_factory(cursor, row):
     return {description[0]: value for description, value in zip(cursor.description, row)}
-
