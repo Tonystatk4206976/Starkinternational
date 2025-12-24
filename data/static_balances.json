@@ -1,0 +1,63 @@
+{
+  "WalaWallet": {
+    "0xwalawalletalpha000000000000000000000001": {
+      "captured_at": "2024-02-15T12:00:00",
+      "native_symbol": "ETH",
+      "native_balance": 2.75,
+      "total_usd": 10600.42,
+      "tokens": [
+        {"symbol": "ETH", "amount": 2.75, "usd_value": 9350.42},
+        {"symbol": "USDC", "amount": 1250.0, "usd_value": 1250.0}
+      ],
+      "notes": "Consolidated holdings from WalaWallet custodial accounts."
+    },
+    "0xwalawalletbeta000000000000000000000002": {
+      "captured_at": "2023-10-21T09:30:00",
+      "native_symbol": "ETH",
+      "native_balance": 1.15,
+      "total_usd": 4150.10,
+      "tokens": [
+        {"symbol": "ETH", "amount": 1.15, "usd_value": 3900.10},
+        {"symbol": "WBTC", "amount": 0.05, "usd_value": 250.0}
+      ]
+    }
+  },
+  "Dormit": {
+    "0xdormitprime00000000000000000000000003": {
+      "captured_at": "2024-01-10T14:45:00",
+      "native_symbol": "MATIC",
+      "native_balance": 850.0,
+      "total_usd": 7700.0,
+      "tokens": [
+        {"symbol": "MATIC", "amount": 850.0, "usd_value": 7200.0},
+        {"symbol": "USDT", "amount": 500.0, "usd_value": 500.0}
+      ],
+      "notes": "Dormit DeFi staking rewards included."
+    }
+  },
+  "Wicket": {
+    "0xwicketstrategya0000000000000000000004": {
+      "captured_at": "2024-03-12T08:15:00",
+      "native_symbol": "SOL",
+      "native_balance": 45.0,
+      "total_usd": 5850.55,
+      "tokens": [
+        {"symbol": "SOL", "amount": 45.0, "usd_value": 5200.55},
+        {"symbol": "USDC", "amount": 650.0, "usd_value": 650.0}
+      ],
+      "notes": "Wicket validator income reinvested."
+    }
+  },
+  "Exchange": {
+    "0xcentralizedholdings000000000000000005": {
+      "captured_at": "2024-02-01T17:20:00",
+      "native_symbol": "BTC",
+      "native_balance": 0.85,
+      "total_usd": 41000.0,
+      "tokens": [
+        {"symbol": "BTC", "amount": 0.85, "usd_value": 41000.0}
+      ],
+      "notes": "Exchange hot wallet mirror."
+    }
+  }
+}
