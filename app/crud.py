@@ -16,7 +16,7 @@ from .models import (
 
 
 def create_wallet(session: Session, wallet_in: WalletCreate) -> Wallet:
-    wallet = Wallet(**wallet_in.model_dump())
+    wallet = Wallet(**wallet_in.dict())
     session.add(wallet)
     session.commit()
     session.refresh(wallet)
@@ -24,7 +24,7 @@ def create_wallet(session: Session, wallet_in: WalletCreate) -> Wallet:
 
 
 def update_wallet(session: Session, wallet: Wallet, wallet_update: WalletUpdate) -> Wallet:
-    update_data = wallet_update.model_dump(exclude_unset=True)
+    update_data = wallet_update.dict(exclude_unset=True)
     if not update_data:
         return wallet
 
@@ -73,7 +73,7 @@ def list_wallets(
 
 
 def create_snapshot(session: Session, snapshot_in: BalanceSnapshotCreate) -> BalanceSnapshot:
-    snapshot = BalanceSnapshot(**snapshot_in.model_dump())
+    snapshot = BalanceSnapshot(**snapshot_in.dict())
     session.add(snapshot)
     session.commit()
     session.refresh(snapshot)

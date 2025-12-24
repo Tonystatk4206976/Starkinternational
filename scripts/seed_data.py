@@ -1,11 +1,10 @@
 """Utility script to seed the database with sample wallets and snapshots."""
 
-from datetime import datetime
+import json
 
 from sqlmodel import Session
 
 from app import crud
-from app.core.config import settings
 from app.db import engine, init_db
 from app.models import BalanceSnapshotCreate, WalletCategory, WalletCreate
 from app.services.registry import get_connector
@@ -65,7 +64,7 @@ def seed() -> None:
                 native_balance=report.native_balance,
                 total_usd=report.total_usd,
                 source=connector.name,
-                data=report.model_dump(),
+                data=json.loads(report.json()),
             )
             crud.create_snapshot(session, snapshot_in)
     print("Seeded sample wallets.")

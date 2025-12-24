@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from sqlmodel import Session
@@ -20,7 +21,7 @@ def refresh_wallet_balance(session: Session, wallet: Wallet):
         native_balance=report.native_balance,
         total_usd=report.total_usd,
         source=connector.name,
-        data=report.model_dump(),
+        data=json.loads(report.json()),
     )
 
     snapshot = crud.create_snapshot(session, snapshot_in)
