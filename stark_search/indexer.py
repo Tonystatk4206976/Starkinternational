@@ -5,6 +5,11 @@ and store the collected information in a SQLite database that supports
 full-text search.  The resulting database can be queried via the
 ``search_database`` function or the command line interface in
 :mod:`stark_search.cli`.
+
+In addition to populating the search index, the module now keeps track of
+notable events (missing files, permission changes, read errors, …) so that
+callers can implement monitoring and alerting workflows on top of the
+ingestion process.
 """
 
 from __future__ import annotations
@@ -13,14 +18,20 @@ import fnmatch
 import os
 import pathlib
 import sqlite3
+import time
 from dataclasses import dataclass
-from typing import Iterator, List, Optional, Sequence
+from typing import Dict, Iterator, List, Optional, Sequence
 
 __all__ = [
     "FileRecord",
+    "AddressRecord",
     "initialize_database",
     "index_directory",
     "search_database",
+    "fetch_recent_events",
+    "add_address",
+    "add_addresses",
+    "fetch_addresses",
 ]
 
 
@@ -33,7 +44,37 @@ class FileRecord:
     extension: str
     size: int
     mtime: float
+    mode: int
     content: Optional[str]
+
+
+@dataclass
+class AddressRecord:
+    """Representation of a tracked blockchain or account address."""
+
+    address: str
+    label: str
+    added_at: float
+
+
+def _normalize_address(address: str) -> str:
+    normalized = address.strip()
+    if not normalized:
+        raise ValueError("address cannot be empty")
+    return normalized
+
+
+def _ensure_column(
+    conn: sqlite3.Connection, table: str, column: str, definition: str
+) -> None:
+    """Add *column* to *table* if it does not already exist."""
+
+    existing = {
+        row[1]
+        for row in conn.execute(f"PRAGMA table_info({table})")
+    }
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def initialize_database(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
@@ -61,10 +102,13 @@ def initialize_database(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
             name TEXT NOT NULL,
             extension TEXT,
             size INTEGER,
-            mtime REAL
+            mtime REAL,
+            mode INTEGER
         )
         """
     )
+
+    _ensure_column(conn, "files_metadata", "mode", "INTEGER")
 
     conn.execute(
         """
@@ -72,6 +116,28 @@ def initialize_database(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
             path UNINDEXED,
             content,
             tokenize = 'porter'
+        )
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            type TEXT NOT NULL,
+            path TEXT,
+            details TEXT
+        )
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS addresses (
+            address TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            added_at REAL NOT NULL
         )
         """
     )
@@ -87,20 +153,37 @@ def _should_ignore(path: pathlib.Path, patterns: Sequence[str]) -> bool:
     return any(fnmatch.fnmatch(path_str, pattern) for pattern in patterns)
 
 
-def _read_text_sample(path: pathlib.Path, max_bytes: int) -> Optional[str]:
+def _read_text_sample(
+    path: pathlib.Path, max_bytes: int
+) -> tuple[Optional[str], Optional[str]]:
     try:
         with path.open("rb") as handle:
             chunk = handle.read(max_bytes)
-    except OSError:
-        return None
+    except OSError as exc:
+        return None, f"Unable to read file: {exc}"
 
     if not chunk:
-        return ""
+        return "", None
 
     try:
-        return chunk.decode("utf-8")
+        return chunk.decode("utf-8"), None
     except UnicodeDecodeError:
-        return chunk.decode("utf-8", errors="ignore")
+        return chunk.decode("utf-8", errors="ignore"), None
+
+
+def _record_event(
+    conn: sqlite3.Connection,
+    event_type: str,
+    path: str,
+    details: str | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO events(timestamp, type, path, details)
+        VALUES(?, ?, ?, ?)
+        """,
+        (time.time(), event_type, path, details),
+    )
 
 
 def iter_files(
@@ -147,31 +230,63 @@ def index_directory(
     conn.execute("BEGIN")
 
     try:
+        existing_records: Dict[str, dict[str, float | int | None]] = {
+            row[0]: {"size": row[1], "mtime": row[2], "mode": row[3]}
+            for row in conn.execute(
+                "SELECT path, size, mtime, mode FROM files_metadata"
+            )
+        }
+
         count = 0
         for file_path in iter_files(
             root,
             follow_symlinks=follow_symlinks,
             ignore_patterns=ignore_patterns,
         ):
-            stat = file_path.stat()
+            try:
+                stat = file_path.stat()
+            except OSError as exc:
+                _record_event(
+                    conn,
+                    "stat_error",
+                    str(file_path),
+                    f"Unable to stat file: {exc}",
+                )
+                continue
+            mode = stat.st_mode & 0o777
+            content, read_error = _read_text_sample(file_path, max_content_bytes)
+            if read_error:
+                _record_event(conn, "read_error", str(file_path), read_error)
             record = FileRecord(
                 path=str(file_path),
                 name=file_path.name,
                 extension=file_path.suffix.lower().lstrip("."),
                 size=stat.st_size,
                 mtime=stat.st_mtime,
-                content=_read_text_sample(file_path, max_content_bytes),
+                mode=mode,
+                content=content,
             )
+
+            previous = existing_records.pop(record.path, None)
+            previous_mode = previous.get("mode") if previous else None
+            if previous_mode is not None and previous_mode != mode:
+                _record_event(
+                    conn,
+                    "permission_change",
+                    record.path,
+                    f"Mode changed from {oct(previous_mode)} to {oct(mode)}",
+                )
 
             conn.execute(
                 """
-                INSERT INTO files_metadata(path, name, extension, size, mtime)
-                VALUES(:path, :name, :extension, :size, :mtime)
+                INSERT INTO files_metadata(path, name, extension, size, mtime, mode)
+                VALUES(:path, :name, :extension, :size, :mtime, :mode)
                 ON CONFLICT(path) DO UPDATE SET
                     name=excluded.name,
                     extension=excluded.extension,
                     size=excluded.size,
-                    mtime=excluded.mtime
+                    mtime=excluded.mtime,
+                    mode=excluded.mode
                 """,
                 {
                     "path": record.path,
@@ -179,21 +294,38 @@ def index_directory(
                     "extension": record.extension,
                     "size": record.size,
                     "mtime": record.mtime,
+                    "mode": record.mode,
                 },
             )
 
             conn.execute(
-                """
-                INSERT INTO files_content(path, content)
-                VALUES(:path, :content)
-                ON CONFLICT(path) DO UPDATE SET content=excluded.content
-                """,
+                "DELETE FROM files_content WHERE path = ?",
+                (record.path,),
+            )
+            conn.execute(
+                "INSERT INTO files_content(path, content) VALUES(:path, :content)",
                 {
                     "path": record.path,
                     "content": record.content or "",
                 },
             )
             count += 1
+
+        for missing_path, previous in existing_records.items():
+            _record_event(
+                conn,
+                "missing_file",
+                missing_path,
+                "File previously indexed but now absent",
+            )
+            conn.execute(
+                "DELETE FROM files_metadata WHERE path = ?",
+                (missing_path,),
+            )
+            conn.execute(
+                "DELETE FROM files_content WHERE path = ?",
+                (missing_path,),
+            )
 
         conn.commit()
         return count
@@ -212,7 +344,7 @@ def search_database(
 ) -> List[dict]:
     """Run an FTS5 query against the database and return matching rows."""
 
-    conn = sqlite3.connect(str(db_path))
+    conn = initialize_database(db_path)
     conn.row_factory = sqlite3.Row
 
     try:
@@ -229,6 +361,139 @@ def search_database(
             """,
             (query, limit),
         )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def fetch_recent_events(
+    db_path: os.PathLike[str] | str,
+    *,
+    limit: int = 50,
+) -> List[dict]:
+    """Return at most *limit* most recent ingestion events."""
+
+    conn = initialize_database(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.execute(
+            """
+            SELECT timestamp, type, path, details
+            FROM events
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def add_address(
+    db_path: os.PathLike[str] | str,
+    address: str,
+    *,
+    label: str,
+) -> AddressRecord:
+    """Insert or update an address entry and record an ingestion event."""
+
+    normalized = _normalize_address(address)
+    timestamp = time.time()
+    conn = initialize_database(db_path)
+    try:
+        with conn:
+            conn.execute(
+                """
+                INSERT INTO addresses(address, label, added_at)
+                VALUES(?, ?, ?)
+                ON CONFLICT(address) DO UPDATE SET
+                    label=excluded.label,
+                    added_at=excluded.added_at
+                """,
+                (normalized, label, timestamp),
+            )
+            _record_event(
+                conn,
+                "address_recorded",
+                normalized,
+                f"Label set to '{label}'",
+            )
+        return AddressRecord(address=normalized, label=label, added_at=timestamp)
+    finally:
+        conn.close()
+
+
+def add_addresses(
+    db_path: os.PathLike[str] | str,
+    addresses: Sequence[str],
+    *,
+    label: str,
+) -> List[AddressRecord]:
+    """Insert or update multiple addresses and record ingestion events."""
+
+    normalized_addresses: List[str] = []
+    seen: set[str] = set()
+    for address in addresses:
+        normalized = _normalize_address(address)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        normalized_addresses.append(normalized)
+
+    timestamp = time.time()
+    conn = initialize_database(db_path)
+    try:
+        with conn:
+            for address in normalized_addresses:
+                conn.execute(
+                    """
+                    INSERT INTO addresses(address, label, added_at)
+                    VALUES(?, ?, ?)
+                    ON CONFLICT(address) DO UPDATE SET
+                        label=excluded.label,
+                        added_at=excluded.added_at
+                    """,
+                    (address, label, timestamp),
+                )
+                _record_event(
+                    conn,
+                    "address_recorded",
+                    address,
+                    f"Label set to '{label}'",
+                )
+        return [
+            AddressRecord(address=address, label=label, added_at=timestamp)
+            for address in normalized_addresses
+        ]
+    finally:
+        conn.close()
+
+
+def fetch_addresses(
+    db_path: os.PathLike[str] | str,
+    *,
+    label: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> List[dict]:
+    """Return addresses stored in the tracking table."""
+
+    conn = initialize_database(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        sql = (
+            "SELECT address, label, added_at FROM addresses"
+            + (" WHERE label = ?" if label else "")
+            + " ORDER BY added_at DESC"
+        )
+        params: List[object] = []
+        if label:
+            params.append(label)
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+
+        cursor = conn.execute(sql, params)
         return [dict(row) for row in cursor.fetchall()]
     finally:
         conn.close()
