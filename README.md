@@ -1,6 +1,47 @@
 # Starkinternational
 
-Fund analytics helpers.
+Fund analytics helpers and a safe personal-finance aggregation foundation.
+
+## Financial Aggregator Foundation
+
+`financial_app.py` provides the first building blocks for a single financial
+application that combines user-authorized financial exports from cloud storage
+with public crypto wallet references.
+
+Security boundaries are intentional:
+
+- Cloud data should come from approved sync folders or a future OAuth flow for
+  Google Drive, Microsoft OneDrive, and Dropbox.
+- Crypto wallets are tracked by public Bitcoin or EVM-compatible addresses only.
+- Private keys, extended private keys, and seed phrases are rejected before they
+  can be stored or processed.
+
+```python
+from financial_app import CloudSource, WalletReference, build_profile
+
+profile = build_profile(
+    sources=[
+        CloudSource("google_drive", "~/Google Drive/Finance"),
+        CloudSource("onedrive", "~/OneDrive/Finance"),
+        CloudSource("dropbox", "~/Dropbox/Finance"),
+    ],
+    wallets=[
+        WalletReference(
+            label="Main ETH",
+            chain="ethereum",
+            address="0x52908400098527886E0F7030069857D2E4169EE7",
+        ),
+    ],
+)
+
+print(profile.net_cashflow())
+print(profile.spending_by_category())
+```
+
+Supported transaction export formats are CSV and JSON. Each transaction should
+include a date (`date`, `posted_at`, or `transaction_date`), description
+(`description`, `memo`, or `name`), and amount (`amount`, `value`, or `total`).
+Optional fields include `currency`, `account`, and `category`.
 
 ## Sentiment Gauge
 
