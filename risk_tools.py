@@ -58,3 +58,13 @@ def format_reinvestment_playbook() -> list[str]:
         "Cash yield parking: hold realized gains in cash-equivalent funds while waiting.",
         "Contrarian index accumulation: scale into broad index exposure during fear spikes.",
     ]
+
+
+def format_profit_taker_summary(plan: ProfitTakerPlan) -> dict[str, str]:
+    """Build compact key/value summary text for dashboard cards and tables."""
+    return {
+        "Shares to sell": f"{plan.shares_to_sell:,.4f}",
+        "Capital recovered": f"${plan.capital_to_recover:,.2f}",
+        "Sale value": f"${plan.gross_sale_value:,.2f}",
+        "Remaining shares": f"{plan.remaining_shares:,.4f}",
+    }

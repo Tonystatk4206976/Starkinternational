@@ -5,12 +5,13 @@ from __future__ import annotations
 import plotly.graph_objects as go
 
 
-def display_sentiment_gauge(score: float) -> go.Figure:
+def display_sentiment_gauge(score: float, *, compact: bool = False) -> go.Figure:
     """Build a Plotly gauge that maps sentiment from [-1.0, 1.0] to [0, 100].
 
     Args:
         score: Sentiment score where -1.0 means extreme fear and +1.0 means
             extreme greed.
+        compact: When True, renders a tighter layout for denser dashboard UIs.
 
     Returns:
         A Plotly figure configured as a sentiment gauge.
@@ -45,7 +46,22 @@ def display_sentiment_gauge(score: float) -> go.Figure:
             },
         )
     )
-    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
+    sentiment_label = (
+        "Extreme Fear" if clipped_score <= -0.6
+        else "Fear" if clipped_score <= -0.2
+        else "Neutral" if clipped_score < 0.2
+        else "Greed" if clipped_score < 0.6
+        else "Extreme Greed"
+    )
+
+    height = 220 if compact else 300
+    number_font_size = 22 if compact else 30
+    title_size = 18 if compact else 24
+    fig.update_traces(
+        number={"suffix": "%", "font": {"size": number_font_size}},
+        title={"text": f"Market Sentiment Index • {sentiment_label}", "font": {"size": title_size}},
+    )
+    fig.update_layout(height=height, margin=dict(l=14, r=14, t=40, b=14 if compact else 20))
     return fig
 
 
