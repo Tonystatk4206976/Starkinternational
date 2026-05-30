@@ -9,7 +9,7 @@ This repo includes a Plotly helper to render a market sentiment gauge.
 ```python
 from sentiment_gauge import display_sentiment_gauge
 
-fig = display_sentiment_gauge(0.42)
+fig = display_sentiment_gauge(0.42, compact=True)
 fig.show()
 ```
 
@@ -17,7 +17,7 @@ For Streamlit:
 
 ```python
 score = calculate_greed_score(headlines)
-st.plotly_chart(display_sentiment_gauge(score), use_container_width=True)
+st.plotly_chart(display_sentiment_gauge(score, compact=True), use_container_width=True)
 ```
 
 ## Profit Taker Calculator
@@ -48,3 +48,15 @@ for item in format_reinvestment_playbook():
 ```
 
 > Educational tooling only — not financial advice.
+
+
+For compact UI cards/tables with the profit taker result:
+
+```python
+from risk_tools import calculate_profit_taker_plan, format_profit_taker_summary
+
+plan = calculate_profit_taker_plan(31.15, 420, 10000)
+summary = format_profit_taker_summary(plan)
+for label, value in summary.items():
+    st.metric(label, value)
+```
