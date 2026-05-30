@@ -47,4 +47,19 @@ for item in format_reinvestment_playbook():
     st.write(f"- {item}")
 ```
 
+## Monitor Loop Re-entry Alert
+
+Use `check_reentry` to trigger one Telegram alert when VIX drops below the calm
+zone, then automatically re-arm once VIX rebounds above `threshold + 2.0`.
+
+```python
+from monitor_loop import check_reentry
+
+# inside your monitor loop
+check_reentry(current_vix)
+```
+
+`monitor_loop.send_telegram` is a stub and should be replaced with your bot
+integration.
+
 > Educational tooling only — not financial advice.
