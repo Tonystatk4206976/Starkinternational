@@ -20,6 +20,26 @@ score = calculate_greed_score(headlines)
 st.plotly_chart(display_sentiment_gauge(score), use_container_width=True)
 ```
 
+## GitHub Activity Merger
+
+Use `merge_github_account_activity` to combine public GitHub event feeds for
+multiple accounts into one newest-first timeline. Events are deduplicated by
+GitHub event ID, which is useful when you want a single activity view for
+separate personal, work, or legacy GitHub accounts.
+
+```python
+from github_activity import merge_github_account_activity, summarize_activity_by_account
+
+activity = merge_github_account_activity(["octocat", "another-account"], pages=1)
+
+for event in activity:
+    print(event.created_at.isoformat(), event.account, event.event_type, event.repo)
+
+print(summarize_activity_by_account(activity))
+```
+
+Set the `token` argument to a GitHub token when you need higher API rate limits.
+
 ## Profit Taker Calculator
 
 Use `calculate_profit_taker_plan` to compute how many shares to sell in order to
