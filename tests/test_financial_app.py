@@ -3,6 +3,8 @@ from decimal import Decimal
 import pytest
 
 from financial_app import (
+    AssetHolding,
+    AssetManager,
     CloudDocumentImporter,
     CloudSource,
     WalletReference,
@@ -53,6 +55,69 @@ def test_profile_summarizes_cashflow_and_spending(tmp_path):
     assert profile.net_cashflow() == Decimal("1100.00")
     assert profile.spending_by_category() == {"Housing": Decimal("1400.00")}
     assert len(profile_fingerprint(profile)) == 64
+
+
+def test_profile_shows_owned_assets_and_managers(tmp_path):
+    onedrive = tmp_path / "onedrive"
+    onedrive.mkdir()
+    (onedrive / "portfolio.assets.csv").write_text(
+        "asset,asset_type,quantity,value,currency,account,manager,manager_type\n"
+        "VTI,etf,12.5,3125.00,USD,Roth IRA,Vanguard,custodian\n"
+        "Emergency Fund,cash,1,10000.00,USD,Savings,Local Credit Union,bank\n",
+        encoding="utf-8",
+    )
+
+    profile = build_profile(
+        [CloudSource("onedrive", onedrive)],
+        [
+            WalletReference(
+                "Cold Wallet",
+                "bitcoin",
+                "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+                manager=AssetManager("Self Custody", "self"),
+            )
+        ],
+        assets=[
+            AssetHolding(
+                "Private Note",
+                "debt",
+                Decimal("1"),
+                Decimal("500.00"),
+                manager=AssetManager("Family Office", "advisor"),
+            )
+        ],
+    )
+
+    rows = profile.unified_asset_view()
+
+    assert profile.total_assets() == Decimal("13625.00")
+    assert profile.assets_by_manager() == {
+        "Family Office": Decimal("500.00"),
+        "Local Credit Union": Decimal("10000.00"),
+        "Vanguard": Decimal("3125.00"),
+    }
+    assert [(row.asset_name, row.manager_name) for row in rows] == [
+        ("Private Note", "Family Office"),
+        ("Emergency Fund", "Local Credit Union"),
+        ("Bitcoin wallet: Cold Wallet", "Self Custody"),
+        ("VTI", "Vanguard"),
+    ]
+
+
+def test_asset_importer_keeps_asset_files_out_of_transactions(tmp_path):
+    drive = tmp_path / "drive"
+    drive.mkdir()
+    (drive / "holdings.assets.json").write_text(
+        '{"assets":[{"name":"AAPL","asset_type":"stock","quantity":"3",'
+        '"market_value":"600","manager_name":"Fidelity","manager_type":"brokerage"}]}',
+        encoding="utf-8",
+    )
+
+    importer = CloudDocumentImporter([CloudSource("google_drive", drive)])
+
+    assert [path.name for path in importer.discover_documents()] == ["holdings.assets.json"]
+    assert importer.import_transactions() == []
+    assert importer.import_assets()[0].manager.name == "Fidelity"
 
 
 def test_wallet_reference_rejects_private_keys_and_seed_phrases():
