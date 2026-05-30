@@ -37,7 +37,7 @@ def calculate_profit_taker_plan(
 
     max_sale_value = current_price * current_shares
     capital_to_recover = min(initial_principal, max_sale_value)
-    shares_to_sell = capital_to_recover / current_price if current_price else 0.0
+    shares_to_sell = capital_to_recover / current_price
     remaining_shares = current_shares - shares_to_sell
 
     return ProfitTakerPlan(
@@ -60,11 +60,19 @@ def format_reinvestment_playbook() -> list[str]:
     ]
 
 
-def format_profit_taker_summary(plan: ProfitTakerPlan) -> dict[str, str]:
+def format_profit_taker_summary(
+    plan: ProfitTakerPlan,
+    *,
+    currency_symbol: str = "$",
+    share_precision: int = 4,
+) -> dict[str, str]:
     """Build compact key/value summary text for dashboard cards and tables."""
+    if share_precision < 0:
+        raise ValueError("share_precision cannot be negative")
+
     return {
-        "Shares to sell": f"{plan.shares_to_sell:,.4f}",
-        "Capital recovered": f"${plan.capital_to_recover:,.2f}",
-        "Sale value": f"${plan.gross_sale_value:,.2f}",
-        "Remaining shares": f"{plan.remaining_shares:,.4f}",
+        "Shares to sell": f"{plan.shares_to_sell:,.{share_precision}f}",
+        "Capital recovered": f"{currency_symbol}{plan.capital_to_recover:,.2f}",
+        "Sale value": f"{currency_symbol}{plan.gross_sale_value:,.2f}",
+        "Remaining shares": f"{plan.remaining_shares:,.{share_precision}f}",
     }
