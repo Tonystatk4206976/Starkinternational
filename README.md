@@ -20,6 +20,28 @@ score = calculate_greed_score(headlines)
 st.plotly_chart(display_sentiment_gauge(score), use_container_width=True)
 ```
 
+## Sentence Similarity
+
+Use `calculate_sentence_similarity` to compare one source sentence against a
+set of candidate sentences with the Hugging Face Inference API. Set `HF_TOKEN`
+in your environment before calling the helper.
+
+```python
+from semantic_similarity import calculate_sentence_similarity
+
+result = calculate_sentence_similarity(
+    "That is a happy person",
+    [
+        "That is a happy dog",
+        "That is a very happy person",
+        "Today is a sunny day",
+    ],
+)
+
+print(result.scores)
+print(result.ranked())
+```
+
 ## Profit Taker Calculator
 
 Use `calculate_profit_taker_plan` to compute how many shares to sell in order to
