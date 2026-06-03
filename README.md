@@ -48,3 +48,61 @@ for item in format_reinvestment_playbook():
 ```
 
 > Educational tooling only — not financial advice.
+
+## Dedalus Machines API Client
+
+This repo includes a dependency-free Python client for Dedalus Machines in
+`dedalus_machines.py`. It mirrors the public shape of the OpenAPI-generated
+`dedalus-sdk` resource tree while returning plain Python dictionaries, so it can
+be used in lightweight automation without adding `httpx` or `pydantic`.
+
+```python
+from dedalus_machines import DedalusMachinesClient
+
+client = DedalusMachinesClient()  # reads DEDALUS_API_KEY
+
+machine = client.machines.create(
+    memory_mib=2048,
+    storage_gib=10,
+    vcpu=1,
+    autosleep="30m",
+)
+machine_id = machine["machine_id"]
+
+result = client.machines.executions.run_and_wait(
+    machine_id=machine_id,
+    command=["bash", "-lc", "python --version"],
+)
+print(result["output"].get("stdout", ""))
+```
+
+Supported resource helpers include:
+
+- Machine lifecycle: `create`, `retrieve`, `update`, `list`, `iter_all`,
+  `sleep`, `wake`, `watch`, `wait_for_phase`, and `delete`.
+- Executions: `create`, `retrieve`, `list`, `iter_all`, `events`, `output`,
+  `delete`, and the convenience `run_and_wait` helper.
+- Ports/previews: `client.machines.previews.create(...)`, `retrieve`, `list`,
+  and `delete`.
+- SSH sessions: `client.machines.ssh.create(...)`, `retrieve`, `list`, and
+  `delete`.
+- Terminals: `client.machines.terminals.create(...)`, `retrieve`, `list`, and
+  `delete`.
+- Artifacts: `client.machines.artifacts.retrieve(...)`, `list`, and `delete`.
+- Usage: `client.usage.retrieve(...)`, `machine_compute`, and
+  `machine_storage`.
+
+If you install Dedalus' official OpenAPI-generated SDK, you can use the wrapper
+when you want generated models, retries, and WebSocket handling:
+
+```python
+from dedalus_machines import GeneratedDedalusMachines
+
+client = GeneratedDedalusMachines.from_default_sdk()
+for machine in client.machines.list():
+    print(machine.machine_id)
+```
+
+The lightweight client defaults to `https://api.dedaluslabs.ai`, uses bearer
+auth from `DEDALUS_API_KEY`, and sends requests to the generated SDK-compatible
+`/v1/machines` and `/v1/usage` endpoints.
