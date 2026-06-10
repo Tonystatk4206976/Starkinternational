@@ -20,6 +20,35 @@ score = calculate_greed_score(headlines)
 st.plotly_chart(display_sentiment_gauge(score), use_container_width=True)
 ```
 
+## Semantic Similarity
+
+Use `semantic_similarity` to compare two pieces of text, or
+`rank_similar_texts` to find the closest matches in a list of headlines, notes,
+or dashboard snippets without adding an external embedding dependency. The
+helpers combine TF-IDF cosine scoring with a small default alias map for common
+market synonyms, such as `shares`/`stocks` and `rally`/`rise`.
+
+```python
+from semantic_similarity import rank_similar_texts, semantic_similarity
+
+score = semantic_similarity(
+    "Chip stocks rally after upbeat AI demand",
+    "Semiconductor shares rise as AI orders improve",
+)
+
+matches = rank_similar_texts(
+    "defensive cash positioning",
+    [
+        "raise cash while volatility is elevated",
+        "momentum rotation into chip makers",
+    ],
+    limit=1,
+)
+
+print(score)
+print(matches[0].text)
+```
+
 ## Profit Taker Calculator
 
 Use `calculate_profit_taker_plan` to compute how many shares to sell in order to
