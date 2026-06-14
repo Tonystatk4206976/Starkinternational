@@ -48,3 +48,30 @@ for item in format_reinvestment_playbook():
 ```
 
 > Educational tooling only — not financial advice.
+
+## Wallet Cross-Reference
+
+Use `cross_reference_wallets` to compare wallet identifiers from an external
+reference list, such as complaint exhibits or discovery spreadsheets, with your
+own known-wallet list. The helper is neutral: it does not include or verify any
+real lawsuit allegations, and it only reports exact normalized overlaps between
+the two datasets you provide.
+
+```python
+from wallet_reference import WalletRecord, cross_reference_wallets
+
+reference_wallets = [
+    WalletRecord("0xabc...123", source="Noah Doe lawsuit reference set"),
+]
+known_wallets = [
+    WalletRecord("0xABC...123", source="my records", label="treasury wallet"),
+]
+
+matches = cross_reference_wallets(reference_wallets, known_wallets)
+for match in matches:
+    print(match.wallet, match.known_labels)
+```
+
+For a large reference set, such as 39,000 wallet rows, stream or load the rows
+from your own CSV/export and pass the wallet column values into
+`cross_reference_wallets`.
