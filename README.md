@@ -47,4 +47,28 @@ for item in format_reinvestment_playbook():
     st.write(f"- {item}")
 ```
 
+## Wallet Cross-Reference Helper
+
+Use `cross_reference_wallets` to identify wallet addresses that appear across
+multiple evidence sources, spreadsheets, or case-review exports. Records are
+dictionary-based so they can be loaded directly from CSV or JSON adapters.
+
+```python
+from wallet_cross_reference import (
+    cross_reference_wallets,
+    format_wallet_cross_reference_report,
+)
+
+records = [
+    {"wallet": " 0xABC ", "source": "exchange export", "label": "defendant"},
+    {"wallet": "0xabc", "source": "bank exhibit", "label": "defendant"},
+    {"wallet": "0xdef", "source": "exchange export"},
+]
+
+for line in format_wallet_cross_reference_report(cross_reference_wallets(records)):
+    print(line)
+```
+
+> Review support only — verify all addresses and source documents before legal use.
+
 > Educational tooling only — not financial advice.
