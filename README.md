@@ -48,3 +48,9 @@ for item in format_reinvestment_playbook():
 ```
 
 > Educational tooling only — not financial advice.
+## Anthropic Citations Reference
+
+A concise implementation guide for Claude Messages API citations is available in
+[`docs/anthropic_citations.md`](docs/anthropic_citations.md). It covers supported
+document types, citation indices, prompt caching compatibility, response
+structure, and Structured Outputs limitations.
