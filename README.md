@@ -13,11 +13,21 @@ fig = display_sentiment_gauge(0.42)
 fig.show()
 ```
 
-For Streamlit:
+For dense Streamlit dashboards, use `compact=True` to reduce vertical space and
+keep the sentiment label inside the gauge title instead of adding a separate text
+widget:
 
 ```python
 score = calculate_greed_score(headlines)
-st.plotly_chart(display_sentiment_gauge(score), use_container_width=True)
+st.plotly_chart(display_sentiment_gauge(score, compact=True), use_container_width=True)
+```
+
+Compact gauges include the sentiment label by default. You can override label
+behavior for either layout when your UI already displays the label elsewhere:
+
+```python
+st.plotly_chart(display_sentiment_gauge(score, compact=True, show_label=False))
+st.plotly_chart(display_sentiment_gauge(score, show_label=True))
 ```
 
 ## Profit Taker Calculator
@@ -36,6 +46,17 @@ plan = calculate_profit_taker_plan(
 
 print(plan.shares_to_sell)
 print(plan.remaining_shares)
+```
+
+For compact UI cards/tables with the profit taker result:
+
+```python
+from risk_tools import calculate_profit_taker_plan, format_profit_taker_summary
+
+plan = calculate_profit_taker_plan(31.15, 420, 10000)
+summary = format_profit_taker_summary(plan, share_decimals=2)
+for label, value in summary.items():
+    st.metric(label, value)
 ```
 
 Optional dashboard copy for reinvestment ideas:
