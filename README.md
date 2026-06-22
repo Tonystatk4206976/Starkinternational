@@ -48,3 +48,36 @@ for item in format_reinvestment_playbook():
 ```
 
 > Educational tooling only — not financial advice.
+
+## Institutional Outreach RAG Workflow
+
+This repository also includes a compliance-first RAG workflow for generating
+organization-level or role-based financial outreach lists from permitted public
+sources only. The workflow is designed for official institutional sources:
+
+- company websites
+- SEC EDGAR filings
+- FINRA/BrokerCheck public firm records
+- Federal Reserve/NIC institution records
+- official press releases
+- annual reports and proxy statements
+
+It intentionally excludes LinkedIn scraping, social-network profiles, personal
+contact brokers, household data, wealth labels, and personal contact dossiers.
+Generated entries should stay at the institutional role level, such as
+`Investor Relations — JPMorgan Chase` or `Corporate Secretary — Citigroup`.
+
+```python
+from institutional_rag import InstitutionalRagWorkflow, default_outreach_queries
+
+workflow = InstitutionalRagWorkflow(
+    allowed_company_domains={"jpmorganchase.com", "bankofamerica.com"}
+)
+
+for step in workflow.workflow_steps():
+    print(step.name, step.compliance_gate)
+
+queries = default_outreach_queries(["JPMorgan Chase", "Bank of America"])
+print(queries)
+```
+
